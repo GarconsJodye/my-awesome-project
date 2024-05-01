@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -13,6 +14,7 @@ const (
 	ErrMixOfRomanAndArabicNumerals = "Ошибка! Введены одновременно разные системы счисления"
 	ErrRomanNegativeResult         = "Ошибка! В римской системе нет отрицательных чисел"
 	ErrOperandOutOfRange           = "Ошибка! Значение выходит за рамки моей работы: %s"
+	ErrInvalidOperator             = "Ошибка! Недопустимый математический оператор"
 )
 
 func main() {
@@ -26,7 +28,8 @@ func main() {
 		input := scanner.Text()
 
 		parts := strings.Split(input, " ")
-		if len(parts) != 3 || len(parts) == 1 && strings.ContainsAny(parts[0], "+-*/") {
+
+		if len(parts) != 3 {
 			panic(ErrInvalidOperationFormat)
 		}
 
@@ -34,6 +37,10 @@ func main() {
 
 		if isRomanNumber(operand1) && !isRomanNumber(operand2) || !isRomanNumber(operand1) && isRomanNumber(operand2) {
 			panic(ErrMixOfRomanAndArabicNumerals)
+		}
+
+		if !isValidOperator(operator) {
+			panic(ErrInvalidOperator)
 		}
 
 		a, err := parseOperand(operand1)
@@ -64,6 +71,9 @@ func main() {
 		}
 
 		if isRomanNumber(operand1) {
+			if result < 1 || result > 100 {
+				panic(fmt.Sprintf(ErrOperandOutOfRange, arabicToRoman(result)))
+			}
 			fmt.Println("Вывод:", arabicToRoman(result))
 		} else {
 			fmt.Println("Вывод:", result)
@@ -73,7 +83,14 @@ func main() {
 
 func parseOperand(operand string) (int, error) {
 	if isRomanNumber(operand) {
-		return romanToArabic(operand)
+		num, err := romanToArabic(operand)
+		if err != nil {
+			return 0, err
+		}
+		if num < 1 || num > 10 {
+			panic(fmt.Sprintf(ErrOperandOutOfRange, operand))
+		}
+		return num, nil
 	}
 
 	num, err := strconv.Atoi(operand)
@@ -89,7 +106,7 @@ func parseOperand(operand string) (int, error) {
 
 func isRomanNumber(operand string) bool {
 	for _, char := range operand {
-		if char != 'I' && char != 'V' && char != 'X' {
+		if char != 'I' && char != 'V' && char != 'X' && char != 'L' && char != 'C' {
 			return false
 		}
 	}
@@ -97,7 +114,7 @@ func isRomanNumber(operand string) bool {
 }
 
 func romanToArabic(roman string) (int, error) {
-	romanNumerals := map[rune]int{'I': 1, 'V': 5, 'X': 10}
+	romanNumerals := map[rune]int{'I': 1, 'V': 5, 'X': 10, 'L': 50, 'C': 100}
 	var result int
 	var prevValue int
 	for i := len(roman) - 1; i >= 0; i-- {
@@ -114,19 +131,27 @@ func romanToArabic(roman string) (int, error) {
 
 func arabicToRoman(arabic int) string {
 	romanNumerals := map[int]string{
-		1: "I", 2: "II", 3: "III", 4: "IV", 5: "V",
-		6: "VI", 7: "VII", 8: "VIII", 9: "IX", 10: "X",
+		1: "I", 4: "IV", 5: "V", 9: "IX", 10: "X",
+		40: "XL", 50: "L", 90: "XC", 100: "C",
 	}
 
 	var result strings.Builder
-	for arabic > 0 {
-		for num := 10; num > 0; num-- {
-			if arabic >= num {
-				result.WriteString(romanNumerals[num])
-				arabic -= num
-				break
-			}
+	var keys []int
+	for key := range romanNumerals {
+		keys = append(keys, key)
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(keys)))
+
+	for _, num := range keys {
+		for arabic >= num {
+			result.WriteString(romanNumerals[num])
+			arabic -= num
 		}
 	}
 	return result.String()
+}
+
+func isValidOperator(operator string) bool {
+	validOperators := map[string]bool{"+": true, "-": true, "*": true, "/": true}
+	return validOperators[operator]
 }
